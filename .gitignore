@@ -4,3 +4,5 @@
 slack_data.csv
 # ide settings
 .vscode/
+# other stuff
+/dask-worker-space
