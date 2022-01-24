@@ -6,3 +6,9 @@ slack_data.csv
 .vscode/
 # other stuff
 /dask-worker-space
+# env vars
+.env
+# messages
+conversation_history.csv
+# py cache
+__pycache__/
