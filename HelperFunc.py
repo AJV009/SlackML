@@ -1,6 +1,10 @@
+import os
 from slack_sdk.errors import SlackApiError
 import pandas as pd
 import datetime
+from pymongo import MongoClient
+from dotenv import load_dotenv
+
 
 class HelperFunc:
 
@@ -23,9 +27,14 @@ class HelperFunc:
             ]
         # convert timestamp to datetime function
         self.ts = lambda x: datetime.datetime.fromtimestamp(float(x)).strftime('%Y-%m-%d %H:%M:%S')
+        load_dotenv()
+        # mongo client
+        client = MongoClient(os.getenv("MONGO_URI"))
+        self.db = client.afk_db
+
 
     # Bin the time series
-    def time_bin_binaryfy(df,time_col,time_gap):
+    def time_bin_binaryfy(self, df, time_col,time_gap):
         temp_df = df.copy()
         # set the time column as index
         temp_df.set_index(temp_df[time_col], inplace=True)
@@ -33,7 +42,7 @@ class HelperFunc:
         temp_df = temp_df.resample(time_gap).sum()
         return temp_df
 
-    def user_filter(df,user=None):
+    def user_filter(self, df, user=None):
         temp_df = df.copy()
         # if user is not None, filter the dataframe
         if user is not None:
@@ -42,12 +51,12 @@ class HelperFunc:
         temp_df.drop(['user'], axis=1, inplace=True)
         return temp_df
 
-    def model_data_prep(self, df, userid=None, time_col='ts', time_gap='1H'):
+    def model_data_prep(self, df, userid=None, time_col='ts', time_gap='1h'):
         prep_data = df.copy()
         # filter the dataframe with user_id
-        prep_data = self.user_filter(prep_data, userid)
+        prep_data = self.user_filter(df=prep_data, user=userid)
         # bin the time series for a persistent time series model
-        prep_data = self.time_bin_binaryfy(prep_data, time_col, time_gap)
+        prep_data = self.time_bin_binaryfy(df=prep_data, time_col=time_col, time_gap=time_gap)
         # convert index to ds column
         prep_data['ds'] = prep_data.index
         # convert text/data column to y column
@@ -96,9 +105,9 @@ class HelperFunc:
             # Save to csv
             df.to_csv('conversation_history.csv')
             # clear data from 'afk_msg_store' collection
-            db.afk_msg_store.delete_many({})
+            self.db.afk_msg_store.delete_many({})
             # insert data to 'afk_msg_store' collection
-            db.afk_msg_store.insert_many(df.to_dict('records'))
+            self.db.afk_msg_store.insert_many(df.to_dict('records'))
         except SlackApiError as e:
             print(f"Got an error: {e.response['error']}")
 
@@ -110,7 +119,7 @@ class HelperFunc:
                 # convert timestamp to datetime
                 msg['ts'] = self.ts(msg['ts'])
                 # insert to mongodb db
-                db.afk_msg_store.insert_one(msg)
+                self.db.afk_msg_store.insert_one(msg)
                 # Update the local CSV file
                 # read conversation_history.csv
                 df = pd.read_csv('conversation_history.csv')
@@ -120,6 +129,10 @@ class HelperFunc:
                 df.sort_values('ts',inplace=True)
                 # save to csv
                 df.to_csv('conversation_history.csv')
+    
+    def mongodb_to_df(self):
+        # fetch complete collection from self.db.afk_msg_store and convert to dataframe and return
+        return pd.DataFrame(list(self.db.afk_msg_store.find()))
 
     # Slack user_id to Slack name
     def userid_name(self, user_id, app):
@@ -157,20 +170,18 @@ class HelperFunc:
                 return user['id']
 
     # Validate time_range variable
-    def time_range_validation(time_range):
+    def time_range_validation(self, time_range):
         # Check if len of time_range is 2
-        if len(time_range) >= 2:
+        if len(time_range) == 2:
             # extract frequency and period from time_range
             freq = time_range[-1]
             periods = int(time_range[:-1])
             # Check if frequency is Hour or Day because others will be inconsistent
-            if freq in ['H', 'h', 'D', 'd']:
-                # Check if period is greater than 0
-                if periods.is_integer() and periods > 0:
-                    return {'res':True, 'msg':'Valid time range'}
-                else:
-                    return {'res':False, 'msg':'Periods must be an integer'}
+            if freq in ['H', 'h'] and periods > 0 and periods <= 24:
+                return {'res':True, 'msg':'Valid hour time range'}
+            elif freq in ['D', 'd'] and periods > 0 and periods <= 365:
+                return {'res':True, 'msg':'Valid day range'}
             else:
-                return {'res':False, 'msg':'time_range must be in the form of "1H", "1D", etc.'}
+                return {'res':False, 'msg':'time must be in the form of "1H", "5h", "1D" or "10d" etc.'}
         else:
-            return {'res':False, 'msg':'time_range must be atleast 2 characters long'}
+            return {'res':False, 'msg':'time_range must be only 2 characters long'}

@@ -1,3 +1,4 @@
+from numpy import empty
 from prophet import Prophet
 from prophet.diagnostics import cross_validation
 from HelperFunc import HelperFunc
@@ -19,9 +20,26 @@ class ModelGen:
         self.helper = HelperFunc()
         self.model = Prophet()
 
-    def modelTrain(self, data, userid=None):
-        data = self.helper.model_data_prep(data, userid)
-        self.model.fit(data)
+    def modelTrain(self, data_source="local", userid=None, time_gap='1H'):
+        # create empty dataframe
+        data = pd.DataFrame()
+        # Read the data from local CSV file
+        if data_source == "local":
+            # try to read the data from local CSV file
+            try:
+                data = pd.read_csv('conversation_history.csv')
+            except:
+                data = self.helper.mongodb_to_df()
+        elif data_source == "cloud":
+            # read complete collection from mongo db to pandas dataframe
+            data = self.helper.mongodb_to_df()
+        # check if data dataframe is empty
+        if data.empty:
+            return {'msg': 'No data found to train, please run /refresh_db to fetch data from Slack.'}
+        else:
+            data = self.helper.model_data_prep(data, userid=userid, time_gap=time_gap)
+            self.model.fit(data)
+            return {'msg': 'Model trained successfully.'}
 
     def modelAccTest(self, data):
         testModel = Prophet()
