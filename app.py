@@ -3,8 +3,8 @@ import os
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from dotenv import load_dotenv
-from HelperFunc import HelperFunc
-from ModelGen import ModelGen
+from src.HelperFunc import HelperFunc
+from src.ModelGen import ModelGen
 
 load_dotenv()
 
@@ -26,7 +26,7 @@ def handle_message_events(body, logger):
 @app.command("/refresh_db")
 def save_messages(ack, respond, command):
     ack()
-    helper.refresh_db(app, os.getenv("SLACK_CHANNEL_ID"))
+    helper.refresh_db(app)
     respond(f"Database refreshed!")
 
 @app.command("/test")

@@ -34,10 +34,12 @@ class HelperFunc:
 
 
     # Bin the time series
-    def time_bin_binaryfy(self, df, time_col,time_gap):
+    def time_bin_binaryfy(self, df, time_col, time_gap):
         temp_df = df.copy()
         # set the time column as index
         temp_df.set_index(temp_df[time_col], inplace=True)
+        # convert index to DateTimeIndex
+        temp_df.index = pd.to_datetime(temp_df.index)
         # resample and sum based on the time_gap, example 1H
         temp_df = temp_df.resample(time_gap).sum()
         return temp_df
@@ -68,7 +70,7 @@ class HelperFunc:
         return prep_data
 
     # Refresh complete conversation history with DB and local CSV file
-    def refresh_db(self, app, channel_id, db):
+    def refresh_db(self, app):
         conversation_history = []
         # Fetch data and save.
         try:
@@ -78,7 +80,7 @@ class HelperFunc:
             while (cursor != ''):
                 # Fetch data from Slack
                 result = app.client.conversations_history(
-                    channel=channel_id,
+                    channel=os.getenv("SLACK_CHANNEL_ID"),
                     limit=70,
                     cursor=cursor
                 )
@@ -103,7 +105,7 @@ class HelperFunc:
             df['text'] = 1
             df.sort_values('ts',inplace=True)
             # Save to csv
-            df.to_csv('conversation_history.csv')
+            df.to_csv('data/conversation_history.csv')
             # clear data from 'afk_msg_store' collection
             self.db.afk_msg_store.delete_many({})
             # insert data to 'afk_msg_store' collection
@@ -122,13 +124,13 @@ class HelperFunc:
                 self.db.afk_msg_store.insert_one(msg)
                 # Update the local CSV file
                 # read conversation_history.csv
-                df = pd.read_csv('conversation_history.csv')
+                df = pd.read_csv('data/conversation_history.csv')
                 # append msg to conversation_history.csv
                 df = df.append(msg, ignore_index=True)
                 # sort by timestamp
                 df.sort_values('ts',inplace=True)
                 # save to csv
-                df.to_csv('conversation_history.csv')
+                df.to_csv('data/conversation_history.csv')
     
     def mongodb_to_df(self):
         # fetch complete collection from self.db.afk_msg_store and convert to dataframe and return

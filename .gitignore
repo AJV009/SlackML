@@ -12,3 +12,5 @@ slack_data.csv
 conversation_history.csv
 # py cache
 __pycache__/
+# model checkpoints
+models/*
