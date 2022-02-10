@@ -23,7 +23,7 @@ class ModelGen:
         self.model_params = {}
 
     # TODO: Complete modelAccTest
-    def modelTrain(self, data_source="local", userid=None, time_col='ts', time_gap='1H'):
+    def modelTrain(self, data_source="local", userid=None, time_col='ts', time_gap='1H', test=False):
         # create empty dataframe
         data = pd.DataFrame()
         # Read the data from local CSV file
@@ -38,8 +38,20 @@ class ModelGen:
             data = self.helper.mongodb_to_df()
         # check if data dataframe is empty
         if data.empty:
-            return {'msg': 'No data found to train, please run /refresh_db to fetch data from Slack.'}
+            return {'msg': 'No data found to train/test, please run /refresh_db to fetch data from Slack.'}
         else:
+            if test:
+
+                # fit the model on the train data
+                self.model.fit(train)
+                # save the model to disk
+                self.modelSave(userid)
+                # predict the test data
+                forecast = self.model.predict(test)
+                # calculate the RMSE
+                rmse = sqrt(mean_squared_error(test[time_col], forecast[time_col]))
+                # return the RMSE
+                return {'msg': 'Model trained successfully.', 'rmse': rmse}
             # if modelLocal returns False, then train the model
             if self.modelLocal(userid)['status'] == False:
                 pass
@@ -47,10 +59,14 @@ class ModelGen:
                 pass
             return {'msg': 'Model trained successfully.'}
 
-    # TODO: Complete modelAccTest
     def modelAccTest(self, data):
-        testModel = Prophet()
-        testModel.fit(data)
+        # split the data into train and test
+        train, test = train_test_split(data, test_size=0.2)
+        # fit the model on the train data
+        
+
+        # testModel = Prophet()
+        # testModel.fit(data)
         # df_cv = cross_validation(testModel, initial='730 days', period='180 days', horizon = '365 days')
 
     def modelPredict(self, freq, periods):

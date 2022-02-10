@@ -32,20 +32,48 @@ def save_messages(ack, respond, command):
 @app.command("/test")
 def user_leave_prediction(ack, respond, command):
     ack()
-    command['text'] = command['text'].replace(u'\xa0', u' ')
-    name = command['text'].split(' ')[0].replace('@', '')
-    time_interval = command['text'].split(' ')[1]
-    uid = helper.name_userid(name=name, app=app)
-    if uid is None:
-        respond(f"Error: Invalid user!")
-    else:
-        time_pred = helper.time_range_validation(time_interval)
-        if time_pred['res']:
-            response = modelGen.modelTrain(userid=uid, time_gap=time_interval)
-            respond(response['msg'])
+    # check if command['text'] is not empty
+    try:
+        if command['text'] == '':
+            raise Exception('Command is empty!')
+        command['text'] = command['text'].replace(u'\xa0', u' ')
+        name = command['text'].split(' ')[0].replace('@', '')
+        time_interval = command['text'].split(' ')[1]
+        uid = helper.name_userid(name=name, app=app)
+        if uid is None:
+            raise Exception('User not found!')
         else:
-            respond(f"Error: {time_pred['msg']}")
+            time_pred = helper.time_range_validation(time_interval)
+            if time_pred['res']:
+                response = modelGen.modelTrain(userid=uid, time_gap=time_interval)
+                respond(response['msg'])
+            else:
+                respond(f"Error: {time_pred['msg']}")
+    except:
+        respond(f"Error: Invalid command format! Try /test @user_name time_interval")
 
+@app.command("/analyze")
+def user_leave_prediction_analyze(ack, respond, command):
+    ack()
+    try:
+        if command['text'] == '':
+            raise Exception('Command is empty!')
+        command['text'] = command['text'].replace(u'\xa0', u' ')
+        name = command['text'].split(' ')[0].replace('@', '')
+        uid = helper.name_userid(name=name, app=app)
+        if uid is None:
+            raise Exception('User not found!')
+        else:
+            response = modelGen.modelAccTest(userid=uid)
+            respond(response['msg'])
+    except:
+        respond(f"Error: Invalid command format! Try /analyze @user_name")
+
+
+# @app.command("/help")
+# def help(ack, respond, command):
+#     ack()
+#     respond(f"Commands:\n/refresh_db - Refresh database with latest messages\n/test @<name> <time_interval> - Predict the user's activity in the given time interval")
 
 # Start your app
 if __name__ == "__main__":
