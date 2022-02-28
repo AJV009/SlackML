@@ -187,3 +187,12 @@ class HelperFunc:
                 return {'res':False, 'msg':'time must be in the form of "1H", "5h", "1D" or "10d" etc.'}
         else:
             return {'res':False, 'msg':'time_range must be only 2 characters long'}
+    
+    def command_info_extrator(self, command, msg, app):
+        msg['text'] = msg['text'].replace(u'\xa0', u' ')
+        name = msg['text'].split(' ')[0].replace('@', '')
+        time_interval = 0
+        if command == 'test':
+            time_interval = msg['text'].split(' ')[1]
+        uid = self.name_userid(name=name, app=app)
+        return {'uid':uid, 'name':name, 'time_interval':time_interval}

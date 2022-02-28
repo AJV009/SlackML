@@ -1,12 +1,13 @@
-from sklearn.metrics import mean_squared_error
 from math import sqrt
 import json, os, pandas as pd, numpy as np
+from pydoc import Helper
 from datetime import datetime
 from prophet import Prophet
 from prophet.diagnostics import cross_validation
+from prophet.diagnostics import performance_metrics
 from prophet.serialize import model_to_json, model_from_json
-from HelperFunc import HelperFunc
-from sklearn.model_selection import train_test_split
+from src.HelperFunc import HelperFunc
+from sklearn.metrics import mean_squared_error
 
 """
 TODO: 
@@ -24,50 +25,34 @@ class ModelGen:
 
     # TODO: Complete modelAccTest
     def modelTrain(self, data_source="local", userid=None, time_col='ts', time_gap='1H', test=False):
-        # create empty dataframe
         data = pd.DataFrame()
-        # Read the data from local CSV file
         if data_source == "local":
-            # try to read the data from local CSV file
             try:
-                data = pd.read_csv('conversation_history.csv')
+                data = pd.read_csv('data/conversation_history.csv')
             except:
-                data = self.helper.mongodb_to_df()
-        elif data_source == "cloud":
-            # read complete collection from mongo db to pandas dataframe
+                data_source = "cloud"
+        if data_source == "cloud":
             data = self.helper.mongodb_to_df()
-        # check if data dataframe is empty
         if data.empty:
             return {'msg': 'No data found to train/test, please run /refresh_db to fetch data from Slack.'}
         else:
+            data = Helper.user_filter(df=data, user=userid)
             if test:
-
-                # fit the model on the train data
-                self.model.fit(train)
-                # save the model to disk
-                self.modelSave(userid)
-                # predict the test data
-                forecast = self.model.predict(test)
-                # calculate the RMSE
-                rmse = sqrt(mean_squared_error(test[time_col], forecast[time_col]))
-                # return the RMSE
-                return {'msg': 'Model trained successfully.', 'rmse': rmse}
-            # if modelLocal returns False, then train the model
-            if self.modelLocal(userid)['status'] == False:
-                pass
-            else:
-                pass
+                res = self.modelAccTest(data)
+                return res
+            # if self.modelLocal(userid)['status'] == False:
+            #     pass
+            # else:
+            #     pass
             return {'msg': 'Model trained successfully.'}
 
     def modelAccTest(self, data):
-        # split the data into train and test
-        train, test = train_test_split(data, test_size=0.2)
-        # fit the model on the train data
-        
-
-        # testModel = Prophet()
-        # testModel.fit(data)
+        self.model.fit(data)
+        print(data.head())
+        # accuracy score from 1 to 10 
+        score = 10
         # df_cv = cross_validation(testModel, initial='730 days', period='180 days', horizon = '365 days')
+        return {'msg': 'Model trained successfully.', 'score': score}
 
     def modelPredict(self, freq, periods):
         future_data = pd.DataFrame(periods=periods, freq=freq, include_history=False)

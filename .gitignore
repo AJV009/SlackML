@@ -13,4 +13,6 @@ conversation_history.csv
 # py cache
 __pycache__/
 # model checkpoints
-models/*
+models/pm_*
+# data
+data/conversation_history.csv
