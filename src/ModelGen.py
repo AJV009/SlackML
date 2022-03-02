@@ -1,6 +1,6 @@
 from math import sqrt
+import itertools
 import json, os, pandas as pd, numpy as np
-from pydoc import Helper
 from datetime import datetime
 from prophet import Prophet
 from prophet.diagnostics import cross_validation
@@ -8,6 +8,7 @@ from prophet.diagnostics import performance_metrics
 from prophet.serialize import model_to_json, model_from_json
 from src.HelperFunc import HelperFunc
 from sklearn.metrics import mean_squared_error
+from dotenv import load_dotenv
 
 """
 TODO: 
@@ -19,7 +20,8 @@ TODO:
 
 class ModelGen:
     def __init__(self) -> None:
-        self.helper = HelperFunc()
+        load_dotenv()
+        self.helper = HelperFunc(yearly_seasonality=True, weekly_seasonality=True, daily_seasonality=True,)
         self.model = Prophet()
         self.model_params = {}
 
@@ -28,7 +30,7 @@ class ModelGen:
         data = pd.DataFrame()
         if data_source == "local":
             try:
-                data = pd.read_csv('data/conversation_history.csv')
+                data = pd.read_csv(os.getenv('DATA_PATH'))
             except:
                 data_source = "cloud"
         if data_source == "cloud":
@@ -36,19 +38,23 @@ class ModelGen:
         if data.empty:
             return {'msg': 'No data found to train/test, please run /refresh_db to fetch data from Slack.'}
         else:
-            data = Helper.user_filter(df=data, user=userid)
             if test:
-                res = self.modelAccTest(data)
-                return res
+                res = self.modelAccTest(data, userid)
+            return res
             # if self.modelLocal(userid)['status'] == False:
             #     pass
             # else:
             #     pass
-            return {'msg': 'Model trained successfully.'}
+            return {'msg': 'Model failed.'}
 
-    def modelAccTest(self, data):
-        self.model.fit(data)
+    def modelAccTest(self, data, userid=None):
+        data = self.helper.model_data_prep(data, userid=userid)
         print(data.head())
+        self.model.fit(data)
+        df_cv = cross_validation(self.model, horizon = 14)
+        print(df_cv.head())
+        df_p = performance_metrics(df_cv)
+        print(df_p.head())
         # accuracy score from 1 to 10 
         score = 10
         # df_cv = cross_validation(testModel, initial='730 days', period='180 days', horizon = '365 days')
@@ -60,7 +66,6 @@ class ModelGen:
         return forecast
 
     def modelSave(self, userid=None):
-        # Save this Prophet model to disk
         model_name = 'pm_' + userid + '_' + str(datetime.now()) + '.json'
         with open(model_name, 'w') as fout:
             json.dump(model_to_json(self.model), fout)  # Save model
@@ -71,11 +76,8 @@ class ModelGen:
         print(model_files)
         if len(model_files) > 0:
             model_file = model_files[0]
-            # split the filename to get the datetime
             model_datetime = model_file.split('_')[-1].split('.')[0]
-            # convert datetime to datetime object
             model_datetime = datetime.strptime(model_datetime, '%Y-%m-%d %H:%M:%S')
-            # check if the model is older than 1 week
             if (datetime.now() - model_datetime).days > day_gap:
                 for f in model_files:
                         os.remove(f)                    

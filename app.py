@@ -1,6 +1,5 @@
 # import dotenv from python
-from cgi import test
-import os
+import os, sys
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from dotenv import load_dotenv
@@ -37,13 +36,14 @@ def user_leave_prediction_analyze(ack, respond, command):
         if command['text'] == '':
             raise Exception('Command is empty!')
         info = helper.command_info_extrator(command='analyze', msg=command, app=app)
-        if info.uid is None:
+        if info['uid'] is None:
             raise Exception('User not found!')
         else:
-            response = modelGen.modelTrain(userid=info.uid, test=True)
+            response = modelGen.modelTrain(userid=info['uid'], test=True)
             respond(response['msg'])
     except:
-        respond(f"Error: Invalid command format! Try /analyze @user_name")
+        print(sys.exc_info())
+        respond(f"Error: Invalid command format! Try /analyze @username")
 
 @app.command("/test")
 def user_leave_prediction(ack, respond, command):
