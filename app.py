@@ -42,7 +42,7 @@ def user_leave_prediction_analyze(ack, respond, command):
             response = modelGen.modelTrain(userid=info['uid'], test=True)
             respond(response['msg'])
     except:
-        print(sys.exc_info())
+        # print(sys.exc_info())
         respond(f"Error: Invalid command format! Try /analyze @username")
 
 @app.command("/test")

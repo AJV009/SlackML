@@ -63,7 +63,6 @@ class HelperFunc:
         try:
             cursor = '0'
             while (cursor != ''):
-                print("Downloading data from slack")
                 result = app.client.conversations_history(
                     channel=os.getenv("SLACK_CHANNEL_ID"),
                     limit=70,
@@ -82,7 +81,6 @@ class HelperFunc:
             df['ts'] = pd.to_datetime(df['ts'].apply(self.ts), format='%Y-%m-%d %H:%M:%S')
             df['text'] = 1
             df.sort_values('ts',inplace=True)
-            print(df.head())
             df.to_csv(os.getenv("SLACK_DATA_PATH"))
             self.db.afk_msg_store.delete_many({})
             self.db.afk_msg_store.insert_many(df.to_dict('records'))

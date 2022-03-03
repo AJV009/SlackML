@@ -50,17 +50,9 @@ class ModelGen:
 
     def modelAccTest(self, data, userid=None):
         data = self.helper.model_data_prep(data, userid=userid)
-        print("1D")
-        print(data.count())
-        print(data.head())
         self.model.fit(data)
-        print("2D")
         df_cv = cross_validation(self.model, horizon = 1)
-        print("3D")
-        print(df_cv.head())
         df_p = performance_metrics(df_cv)
-        print("Perf Metrics Data Head")
-        print(df_p.head())
         # accuracy score from 1 to 10 
         score = 10
         # df_cv = cross_validation(testModel, initial='730 days', period='180 days', horizon = '365 days')
@@ -79,7 +71,6 @@ class ModelGen:
     def modelLocal(self, userid=None, day_gap=4):
         model_name_start = 'pm_' + userid + '_'
         model_files = [f for f in os.listdir('models/') if f.startswith(model_name_start)]
-        print(model_files)
         if len(model_files) > 0:
             model_file = model_files[0]
             model_datetime = model_file.split('_')[-1].split('.')[0]
