@@ -29,8 +29,24 @@ def save_messages(ack, respond, command):
     helper.refresh_db(app)
     respond(f"Database refreshed!")
 
-@app.command("/analyze")
-def user_leave_prediction_analyze(ack, respond, command):
+# @app.command("/analyze")
+# def user_leave_prediction_analyze(ack, respond, command):
+#     ack()
+#     try:
+#         if command['text'] == '':
+#             raise Exception('Command is empty!')
+#         info = helper.command_info_extrator(command='analyze', msg=command, app=app)
+#         if info['uid'] is None:
+#             raise Exception('User not found!')
+#         else:
+#             response = modelGen.modelTrain(userid=info['uid'], test=True)
+#             respond(response['msg'])
+#     except:
+#         # print(sys.exc_info())
+#         respond(f"Error: Invalid command format! Try /analyze @username")
+
+@app.command("/predict")
+def user_leave_prediction(ack, respond, command):
     ack()
     try:
         if command['text'] == '':
@@ -39,30 +55,15 @@ def user_leave_prediction_analyze(ack, respond, command):
         if info['uid'] is None:
             raise Exception('User not found!')
         else:
-            response = modelGen.modelTrain(userid=info['uid'], test=True)
-            respond(response['msg'])
-    except:
-        # print(sys.exc_info())
-        respond(f"Error: Invalid command format! Try /analyze @username")
-
-@app.command("/test")
-def user_leave_prediction(ack, respond, command):
-    ack()
-    try:
-        if command['text'] == '':
-            raise Exception('Command is empty!')
-        info = helper.command_info_extrator(command='analyze', msg=command, app=app)
-        if info.uid is None:
-            raise Exception('User not found!')
-        else:
-            time_pred = helper.time_range_validation(info.time_interval)
+            time_pred = helper.time_range_validation(info['time_interval'])
             if time_pred['res']:
-                response = modelGen.modelTrain(userid=info.uid, time_gap=info.time_interval)
-                respond(response['msg'])
+                # Work on ModelTrain, check ToDo in src/ModelGen.py
+                response = modelGen.modelTrain(userid=info['uid'], time_gap=info['time_interval'])
             else:
-                respond(f"Error: {time_pred['msg']}")
+                response = {'msg': time_pred['msg'], 'status':False}
     except:
-        respond(f"Error: Invalid command format! Try /test @user_name time_interval")
+        response = {'msg': 'Error: Invalid command format! Try /predict @username', 'status':False}
+    respond(response['msg'])
 
 
 # @app.command("/help")
