@@ -1,10 +1,10 @@
 import os
+from tabnanny import check
 from slack_sdk.errors import SlackApiError
 import pandas as pd
 import datetime
 from pymongo import MongoClient
 from dotenv import load_dotenv
-
 
 class HelperFunc:
 
@@ -29,7 +29,6 @@ class HelperFunc:
         load_dotenv()
         client = MongoClient(os.getenv("MONGO_URI"))
         self.db = client.afk_db
-
 
     # Bin the time series
     def time_bin_binaryfy(self, df, time_col='ts', time_gap='1h'):
@@ -64,6 +63,7 @@ class HelperFunc:
         try:
             cursor = '0'
             while (cursor != ''):
+                print("Downloading data from slack")
                 result = app.client.conversations_history(
                     channel=os.getenv("SLACK_CHANNEL_ID"),
                     limit=70,
@@ -82,23 +82,42 @@ class HelperFunc:
             df['ts'] = pd.to_datetime(df['ts'].apply(self.ts), format='%Y-%m-%d %H:%M:%S')
             df['text'] = 1
             df.sort_values('ts',inplace=True)
-            df.to_csv('data/conversation_history.csv')
+            print(df.head())
+            df.to_csv(os.getenv("SLACK_DATA_PATH"))
             self.db.afk_msg_store.delete_many({})
             self.db.afk_msg_store.insert_many(df.to_dict('records'))
         except SlackApiError as e:
             print(f"Got an error: {e.response['error']}")
 
     # Insert single message to db and local csv file
-    def insert_single(self, msg, db):
+    def insert_single(self, msg):
         if any(word in msg['text'].lower() for word in self.kw):
             if msg['user'] is not None:
                 msg['ts'] = self.ts(msg['ts'])
-                self.db.afk_msg_store.insert_one(msg)
-                df = pd.read_csv('data/conversation_history.csv')
-                df = df.append(msg, ignore_index=True)
-                df.sort_values('ts',inplace=True)
-                df.to_csv('data/conversation_history.csv')
-    
+                self.in_data_prep(msg)
+
+    def in_data_prep(self, msg=None):
+        if msg == None:
+            return self.mongodb_to_df()
+        else:
+            return self.input_data(msg)
+
+    def input_data(self, msg):
+        msg['text'] = 1
+        self.db.afk_msg_store.insert_one(msg)
+        if os.path.exists(os.getenv("SLACK_DATA_PATH")):
+            df = self.file_clean_read()
+        else:
+            df = self.mongodb_to_df()
+        df = df.append(msg, ignore_index=True)
+        df.sort_values('ts',inplace=True)
+        df.to_csv(os.getenv("SLACK_DATA_PATH"))
+
+    def file_clean_read(self):
+        df = pd.read_csv(os.getenv("SLACK_DATA_PATH"))
+        df = df[['text', 'user', 'ts']]
+        return df
+
     # Fetch data from 
     def mongodb_to_df(self):
         data = pd.DataFrame(list(self.db.afk_msg_store.find()))
@@ -118,14 +137,14 @@ class HelperFunc:
     def userid_display_name(self, user_id, app):
         user_info = app.client.users_info(user=user_id)
         return user_info['user']['profile']['display_name']
-    
+
     # Convert Slack name to user_id
     def name_userid(self, name, app):
         user_info = app.client.users_list()
         for user in user_info['members']:
             if user['name'] == name:
                 return user['id']
-    
+
     # Convert Slack real_name to user_id 
     def real_name_userid(self, real_name, app):
         user_info = app.client.users_list()
@@ -146,7 +165,7 @@ class HelperFunc:
                 return {'res':False, 'msg':'time must be in the form of "1H", "5h", "1D" or "10d" etc.'}
         else:
             return {'res':False, 'msg':'time_range must be only 2 characters long'}
-    
+
     def command_info_extrator(self, command, msg, app):
         msg['text'] = msg['text'].replace(u'\xa0', u' ')
         name = msg['text'].split(' ')[0].replace('@', '')

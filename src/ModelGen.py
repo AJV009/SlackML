@@ -19,10 +19,11 @@ TODO:
 """
 
 class ModelGen:
+
     def __init__(self) -> None:
         load_dotenv()
-        self.helper = HelperFunc(yearly_seasonality=True, weekly_seasonality=True, daily_seasonality=True,)
-        self.model = Prophet()
+        self.helper = HelperFunc()
+        self.model = Prophet(yearly_seasonality=True, weekly_seasonality=True, daily_seasonality=True)
         self.model_params = {}
 
     # TODO: Complete modelAccTest
@@ -30,11 +31,11 @@ class ModelGen:
         data = pd.DataFrame()
         if data_source == "local":
             try:
-                data = pd.read_csv(os.getenv('DATA_PATH'))
+                data = self.helper.file_clean_read()
             except:
                 data_source = "cloud"
         if data_source == "cloud":
-            data = self.helper.mongodb_to_df()
+            data = self.helper.in_data_prep()
         if data.empty:
             return {'msg': 'No data found to train/test, please run /refresh_db to fetch data from Slack.'}
         else:
@@ -49,11 +50,16 @@ class ModelGen:
 
     def modelAccTest(self, data, userid=None):
         data = self.helper.model_data_prep(data, userid=userid)
+        print("1D")
+        print(data.count())
         print(data.head())
         self.model.fit(data)
-        df_cv = cross_validation(self.model, horizon = 14)
+        print("2D")
+        df_cv = cross_validation(self.model, horizon = 1)
+        print("3D")
         print(df_cv.head())
         df_p = performance_metrics(df_cv)
+        print("Perf Metrics Data Head")
         print(df_p.head())
         # accuracy score from 1 to 10 
         score = 10
@@ -80,7 +86,7 @@ class ModelGen:
             model_datetime = datetime.strptime(model_datetime, '%Y-%m-%d %H:%M:%S')
             if (datetime.now() - model_datetime).days > day_gap:
                 for f in model_files:
-                        os.remove(f)                    
+                    os.remove(f)                    
             else:
                 with open(model_file, 'r') as fin:
                     self.model = Prophet()
