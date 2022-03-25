@@ -16,6 +16,7 @@ modelGen = ModelGen()
 
 @app.event("message")
 def handle_message_events(body, logger):
+    # detects every message
     msg = {
         'text':body['event']['text'],
         'user': body['event']['user'],
@@ -25,40 +26,29 @@ def handle_message_events(body, logger):
 
 @app.command("/refresh_db")
 def save_messages(ack, respond, command):
+    # Command to refresh db
     ack()
     helper.refresh_db(app)
     respond(f"Database refreshed!")
 
-# @app.command("/analyze")
-# def user_leave_prediction_analyze(ack, respond, command):
-#     ack()
-#     try:
-#         if command['text'] == '':
-#             raise Exception('Command is empty!')
-#         info = helper.command_info_extrator(command='analyze', msg=command, app=app)
-#         if info['uid'] is None:
-#             raise Exception('User not found!')
-#         else:
-#             response = modelGen.modelTrain(userid=info['uid'], test=True)
-#             respond(response['msg'])
-#     except:
-#         # print(sys.exc_info())
-#         respond(f"Error: Invalid command format! Try /analyze @username")
-
 @app.command("/predict")
 def user_leave_prediction(ack, respond, command):
+    # Command to predict pattenrs in user leaves
     ack()
     try:
+        # Check if command is empty
         if command['text'] == '':
             raise Exception('Command is empty!')
-        info = helper.command_info_extrator(command='analyze', msg=command, app=app)
+        # Extract information from the command
+        info = helper.command_info_extrator(msg=command, app=app)
+        # Validate user_id
         if info['uid'] is None:
             raise Exception('User not found!')
         else:
+            # Validate provided time_range then start main prediction code
             time_pred = helper.time_range_validation(info['time_interval'])
-            if time_pred['res']:
-                # Work on ModelTrain, check ToDo in src/ModelGen.py
-                response = modelGen.modelTrain(userid=info['uid'], time_gap=info['time_interval'])
+            if time_pred['status']:
+                response = modelGen.modelTrain(userid=info['uid'], time_pred_range=info['time_interval'])
             else:
                 response = {'msg': time_pred['msg'], 'status':False}
     except:

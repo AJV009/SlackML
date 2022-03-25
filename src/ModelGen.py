@@ -1,13 +1,10 @@
-from math import sqrt
-import itertools
-import json, os, pandas as pd, numpy as np
+import json, os, pandas as pd
 from datetime import datetime
 from prophet import Prophet
 from prophet.diagnostics import cross_validation
 from prophet.diagnostics import performance_metrics
 from prophet.serialize import model_to_json, model_from_json
 from src.HelperFunc import HelperFunc
-from sklearn.metrics import mean_squared_error
 from dotenv import load_dotenv
 
 """
@@ -33,56 +30,66 @@ class ModelGen:
         self.model = Prophet(yearly_seasonality=True, weekly_seasonality=True, daily_seasonality=True)
         self.model_params = {}
 
-    # TODO: Complete modelAccTest
-    def modelTrain(self, data_source="local", userid=None, time_col='ts', time_gap='1H'):
+    # main function to train model
+    def modelTrain(self, time_pred_range, userid=None, time_col='ts', time_gap='1H', ):
         data = pd.DataFrame()
-        if data_source == "local":
-            try:
-                data = self.helper.file_clean_read()
-            except:
-                data_source = "cloud"
-        if data_source == "cloud":
-            data = self.helper.in_data_prep()
+        # check data source and load data
+        data = self.helper.init_data_prep(data_source="local")
+        # check if data is empty
         if data.empty:
             return {'msg': 'No data found to train/test, please run /refresh_db to fetch data from Slack.' ,'status':False}
         else:
-            # if self.modelLocal(userid)['status'] == False:
-            #     pass
-            # else:
-            #     pass
+            # Check if model already exists for the user and load it if exists else train new model and save it for future use.
+            model_data = self.modelTest(data, userid=userid)
+            
             return {'msg': 'Model failed.', 'status':False} 
+    
+    # predict user leave
+    def modelTest(self, data, time_pred_range, userid=None):
+        model_locally_saved = self.loadLocalModel(userid=userid)['status']
+        score = 0
+        if not model_locally_saved:
+            # Filter and prep data for new model.
+            data = self.helper.model_data_prep(data, userid=userid)
+            # load model from local file
+            self.model.fit(data)
+            if len(data) < 14:
+                return {'msg': 'Not enough data to train/test model.','status':False}
+        df_cv = cross_validation(self.model, horizon = "168 hours")
+        df_cv_metrics = performance_metrics(df_cv)
+        score = df_cv_metrics.loc['MSE', 'train']
+        print(score)
+        # TODO
+        if score < 0.1:
+            self.modelSave(userid=userid)
+            return {'msg': 'Model trained successfully.', 'status':True}
+        else:
+            return {'msg': 'Model failed.', 'status':False}
 
-    # def modelAccTest(self, data, userid=None):
-    #     score = 0
-    #     data = self.helper.model_data_prep(data, userid=userid)
-    #     if len(data) < 14:
-    #         return {'msg': 'Not enough data to train/test model.','status':False}
-    #     self.model.fit(data)
-    #     df_cv = cross_validation(self.model, horizon = 7)
-    #     df_p = performance_metrics(df_cv)
-    #     return {'msg': 'Model trained successfully.', 'score': score, 'status':True}
-
-    # def modelPredict(self, freq, periods):
-    #     future_data = pd.DataFrame(periods=periods, freq=freq, include_history=False)
-    #     forecast = self.model.predict(future_data)
-    #     return forecast
-
-    def modelLocal(self, userid=None, day_gap=4):
+    # load model from local file if exists also check if model is too old.
+    def loadLocalModel(self, userid=None, day_gap=4):
+        # model name pattern
         model_name_start = 'pm_' + userid + '_'
+        # list of all models
         model_files = [f for f in os.listdir('models/') if f.startswith(model_name_start)]
         if len(model_files) > 0:
+            # get the first model from the list
             model_file = model_files[0]
+            # get the last modified date of the model
             model_datetime = model_file.split('_')[-1].split('.')[0]
             model_datetime = datetime.strptime(model_datetime, '%Y-%m-%d %H:%M:%S')
+            # delete model if older than the day_gap
             if (datetime.now() - model_datetime).days > day_gap:
                 for f in model_files:
-                    os.remove(f)                    
+                    os.remove(f)
+                    return {'msg': 'Model is older than ' + str(day_gap) + ' days.' ,'status':False}
             else:
+                # load model from local file
                 with open(model_file, 'r') as fin:
                     self.model = Prophet()
                     self.model = model_from_json(json.load(fin))
-                return {'status':True, 'msg': 'Model loaded successfully.'}
-        return {'status':False, 'msg': 'No model found to load.'}
+                return {'msg': 'Model loaded successfully.', 'status':True}
+        return {'msg': 'No model found to load.', 'status':False}
 
     def modelSave(self, userid=None):
         model_name = 'pm_' + userid + '_' + str(datetime.now()) + '.json'

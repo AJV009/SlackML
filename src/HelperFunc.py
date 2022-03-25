@@ -1,5 +1,4 @@
 import os
-from tabnanny import check
 from slack_sdk.errors import SlackApiError
 import pandas as pd
 import datetime
@@ -30,27 +29,37 @@ class HelperFunc:
         client = MongoClient(os.getenv("MONGO_URI"))
         self.db = client.afk_db
 
-    # Bin the time series
-    def time_bin_binaryfy(self, df, time_col='ts', time_gap='1h'):
-        temp_df = df.copy()
-        temp_df.set_index(temp_df[time_col], inplace=True)
-        temp_df.index = pd.to_datetime(temp_df.index)
-        temp_df = temp_df.resample(time_gap).sum()
-        return temp_df
-
+    # Filters user
     def user_filter(self, df, user=None):
         temp_df = df.copy()
         if user is not None:
+            # filter user
             temp_df = temp_df[temp_df['user']==user]
         temp_df.drop(['user'], axis=1, inplace=True)
         return temp_df
 
+    # Bin the time series
+    def time_bin_binaryfy(self, df, time_col='ts', time_gap='1h'):
+        temp_df = df.copy()
+        # set time as index
+        temp_df.set_index(temp_df[time_col], inplace=True)
+        # convert time/index to datetime
+        temp_df.index = pd.to_datetime(temp_df.index)
+        # resample using the time gap and sum them
+        temp_df = temp_df.resample(time_gap).sum()
+        return temp_df
+
+    # Prep data for model
     def model_data_prep(self, df, userid=None, time_col='ts', time_gap='1h'):
         prep_data = df.copy()
+        # filter user
         prep_data = self.user_filter(df=prep_data, user=userid)
+        # bin time
         prep_data = self.time_bin_binaryfy(df=prep_data, time_col=time_col, time_gap=time_gap)
+        # prep data for Prophet
         prep_data['ds'] = prep_data.index
         prep_data['y'] = prep_data['text']
+        # drop unnecessary columns like _id and text
         if '_id' in prep_data.columns:
             prep_data.drop(['_id'], axis=1, inplace=True)
         prep_data.drop(['text'], axis=1, inplace=True)
@@ -111,8 +120,22 @@ class HelperFunc:
         df.sort_values('ts',inplace=True)
         df.to_csv(os.getenv("SLACK_DATA_PATH"))
 
+    def init_data_prep(self, data_source):
+        if data_source == "local":
+            try:
+                # load local data
+                return self.helper.file_clean_read()
+            except:
+                # If failed set to load from cloud (MongoDB)
+                data_source = "cloud"
+        if data_source == "cloud":
+            # load data from cloud
+            return self.helper.in_data_prep()
+
+    # Load data from local csv file
     def file_clean_read(self):
         df = pd.read_csv(os.getenv("SLACK_DATA_PATH"))
+        # Clean any unnecessary columns
         df = df[['text', 'user', 'ts']]
         return df
 
@@ -156,19 +179,22 @@ class HelperFunc:
             freq = time_range[-1]
             periods = int(time_range[:-1])
             if freq in ['H', 'h'] and periods > 0 and periods <= 24:
-                return {'res':True, 'msg':'Valid hour time range'}
+                return {'status':True, 'msg':'Valid hour time range'}
             elif freq in ['D', 'd'] and periods > 0 and periods <= 365:
-                return {'res':True, 'msg':'Valid day range'}
+                return {'status':True, 'msg':'Valid day range'}
             else:
-                return {'res':False, 'msg':'time must be in the form of "1H", "5h", "1D" or "10d" etc.'}
+                return {'status':False, 'msg':'time must be in the form of "1H", "5h", "1D" or "10d" etc.'}
         else:
-            return {'res':False, 'msg':'time_range must be only 2 characters long'}
+            return {'status':False, 'msg':'time_range must be only 2 characters long'}
 
-    def command_info_extrator(self, command, msg, app):
+    # Extract information from message
+    def command_info_extrator(self, msg, app):
+        # Extract emssage and replace space code with actual space
         msg['text'] = msg['text'].replace(u'\xa0', u' ')
+        # Extract username
         name = msg['text'].split(' ')[0].replace('@', '')
-        time_interval = 0
-        if command == 'test':
-            time_interval = msg['text'].split(' ')[1]
+        # Extract time range
+        time_interval = msg['text'].split(' ')[1]
+        # Get UID from username
         uid = self.name_userid(name=name, app=app)
         return {'uid':uid, 'name':name, 'time_interval':time_interval}
