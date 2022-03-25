@@ -31,7 +31,7 @@ class ModelGen:
         self.model_params = {}
 
     # main function to train model
-    def modelTrain(self, time_pred_range, userid=None, time_col='ts', time_gap='1H', ):
+    def modelTrain(self, userid=None, time_col='ts', time_gap='1H'):
         data = pd.DataFrame()
         # check data source and load data
         data = self.helper.init_data_prep(data_source="local")
@@ -45,7 +45,7 @@ class ModelGen:
             return {'msg': 'Model failed.', 'status':False} 
 
     # predict user leave
-    def modelTest(self, data, time_pred_range, userid=None):
+    def modelTest(self, data, userid=None):
         model_locally_saved = self.loadLocalModel(userid=userid)['status']
         score = 0
         if not model_locally_saved:
@@ -55,16 +55,17 @@ class ModelGen:
             self.model.fit(data)
             if len(data) < 14:
                 return {'msg': 'Not enough data to train/test model.','status':False}
-        df_cv = cross_validation(self.model, horizon = "168 hours")
+        df_cv = cross_validation(self.model, initial='1 day', period='1 day', horizon='1 day', parallel="dask")
         df_cv_metrics = performance_metrics(df_cv)
-        score = df_cv_metrics.loc['MSE', 'train']
-        print(score)
+        print(df_cv_metrics)
+        # score = df_cv_metrics.loc['MSE', 'train']
+        # print(score)
         # TODO write a score and predict function.
-        if score < 0.1:
-            self.modelSave(userid=userid)
-            return {'msg': 'Model trained successfully.', 'status':True}
-        else:
-            return {'msg': 'Model failed.', 'status':False}
+        # if score < 0.1:
+        #     self.modelSave(userid=userid)
+        #     return {'msg': 'Model trained successfully.', 'status':True}
+        # else:
+        #     return {'msg': 'Model failed.', 'status':False}
 
     # load model from local file if exists also check if model is too old.
     def loadLocalModel(self, userid=None, day_gap=4):
@@ -81,7 +82,7 @@ class ModelGen:
             # delete model if older than the day_gap
             if (datetime.now() - model_datetime).days > day_gap:
                 for f in model_files:
-                    os.remove(f)
+                    os.remove('models/'+f)
                     return {'msg': 'Model is older than ' + str(day_gap) + ' days.' ,'status':False}
             else:
                 # load model from local file
@@ -91,7 +92,8 @@ class ModelGen:
                 return {'msg': 'Model loaded successfully.', 'status':True}
         return {'msg': 'No model found to load.', 'status':False}
 
+    # Save model to local file
     def modelSave(self, userid=None):
         model_name = 'pm_' + userid + '_' + str(datetime.now()) + '.json'
-        with open(model_name, 'w') as fout:
+        with open('models/'+model_name, 'w') as fout:
             json.dump(model_to_json(self.model), fout)  # Save model

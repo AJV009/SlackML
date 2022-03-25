@@ -62,6 +62,8 @@ class HelperFunc:
         # drop unnecessary columns like _id and text
         if '_id' in prep_data.columns:
             prep_data.drop(['_id'], axis=1, inplace=True)
+        if 'ts' in prep_data.columns:
+            prep_data.drop(['ts'], axis=1, inplace=True)
         prep_data.drop(['text'], axis=1, inplace=True)
         prep_data.reset_index(drop=True, inplace=True)
         return prep_data
@@ -124,13 +126,13 @@ class HelperFunc:
         if data_source == "local":
             try:
                 # load local data
-                return self.helper.file_clean_read()
+                return self.file_clean_read()
             except:
                 # If failed set to load from cloud (MongoDB)
                 data_source = "cloud"
         if data_source == "cloud":
             # load data from cloud
-            return self.helper.in_data_prep()
+            return self.in_data_prep()
 
     # Load data from local csv file
     def file_clean_read(self):
@@ -194,7 +196,7 @@ class HelperFunc:
         # Extract username
         name = msg['text'].split(' ')[0].replace('@', '')
         # Extract time range
-        time_interval = msg['text'].split(' ')[1]
+        # time_interval = msg['text'].split(' ')[1]
         # Get UID from username
         uid = self.name_userid(name=name, app=app)
-        return {'uid':uid, 'name':name, 'time_interval':time_interval}
+        return {'uid':uid, 'name':name, 'time_interval':"7d"}

@@ -35,24 +35,26 @@ def save_messages(ack, respond, command):
 def user_leave_prediction(ack, respond, command):
     # Command to predict pattenrs in user leaves
     ack()
-    try:
+    # try:
         # Check if command is empty
-        if command['text'] == '':
-            raise Exception('Command is empty!')
-        # Extract information from the command
-        info = helper.command_info_extrator(msg=command, app=app)
-        # Validate user_id
-        if info['uid'] is None:
-            raise Exception('User not found!')
-        else:
-            # Validate provided time_range then start main prediction code
-            time_pred = helper.time_range_validation(info['time_interval'])
-            if time_pred['status']:
-                response = modelGen.modelTrain(userid=info['uid'], time_pred_range=info['time_interval'])
-            else:
-                response = {'msg': time_pred['msg'], 'status':False}
-    except:
-        response = {'msg': 'Error: Invalid command format! Try /predict @username', 'status':False}
+    if command['text'] == '':
+        raise Exception('Command is empty!')
+    # Extract information from the command
+    info = helper.command_info_extrator(msg=command, app=app)
+    # Validate user_id
+    if info['uid'] is None:
+        raise Exception('User not found!')
+    else:
+        # Validate provided time_range then start main prediction code
+        # time_pred = helper.time_range_validation(info['time_interval'])
+        # if time_pred['status']:
+        response = modelGen.modelTrain(userid=info['uid'])
+        # else:
+        #     response = {'msg': time_pred['msg'], 'status':False}
+    # except:
+    #     # print the raised exception
+    #     print(sys.exc_info())
+    #     response = {'msg': 'Error: Invalid command format! Try /predict @username', 'status':False}
     respond(response['msg'])
 
 
