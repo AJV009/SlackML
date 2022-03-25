@@ -41,9 +41,9 @@ class ModelGen:
         else:
             # Check if model already exists for the user and load it if exists else train new model and save it for future use.
             model_data = self.modelTest(data, userid=userid)
-            
+
             return {'msg': 'Model failed.', 'status':False} 
-    
+
     # predict user leave
     def modelTest(self, data, time_pred_range, userid=None):
         model_locally_saved = self.loadLocalModel(userid=userid)['status']
@@ -59,7 +59,7 @@ class ModelGen:
         df_cv_metrics = performance_metrics(df_cv)
         score = df_cv_metrics.loc['MSE', 'train']
         print(score)
-        # TODO
+        # TODO write a score and predict function.
         if score < 0.1:
             self.modelSave(userid=userid)
             return {'msg': 'Model trained successfully.', 'status':True}
@@ -95,4 +95,3 @@ class ModelGen:
         model_name = 'pm_' + userid + '_' + str(datetime.now()) + '.json'
         with open(model_name, 'w') as fout:
             json.dump(model_to_json(self.model), fout)  # Save model
-
